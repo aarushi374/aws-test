@@ -1,0 +1,12 @@
+InstanceID,Region,InstanceType,LaunchTime,CreationTime
+i-052c1fa26c8498c96,ap-south-1,t2.large,2020-02-04 06:41:35+00:00,
+i-03a5ff3d879dcb60e,ap-south-1,t2.large,2021-12-18 13:16:56+00:00,
+i-01f22c71d1b341906,ap-south-1,t3a.large,2021-12-13 21:21:03+00:00,
+i-0f6c6d0790adc1c07,us-west-2,t2.large,2022-12-21 10:33:33+00:00,
+i-048c8179b9ad27c77,us-west-2,t2.medium,2023-03-16 06:25:16+00:00,
+i-032274eaac5af4772,us-west-2,r5.xlarge,2023-01-30 12:56:03+00:00,
+i-0107daf62392a6926,us-west-2,t2.medium,2022-11-10 14:10:35+00:00,
+i-09038d8fa270fb09b,us-west-2,r5.large,2022-09-15 12:10:39+00:00,
+i-055a705eff36b206b,us-west-2,m6g.medium,2023-01-25 13:07:10+00:00,
+i-0ceb8312ffa38830f,us-west-2,r5.large,2023-02-20 10:24:05+00:00,
+i-0d5b495a825bb03ce,us-west-2,t2.medium,2023-03-02 12:47:00+00:00,
