@@ -1,308 +1,424 @@
-resource "aws_instance" "web_host" {
+resource "aws_db_instance" "default" {
+
+  name                   = var.dbname
+  engine                 = "mysql"
+  option_group_name      = aws_db_option_group.default.name
+  parameter_group_name   = aws_db_parameter_group.default.name
+  db_subnet_group_name   = aws_db_subnet_group.default.name
+  vpc_security_group_ids = ["${aws_security_group.default.id}"]
+
+  identifier              = "rds-${local.resource_prefix.value}"
+  engine_version          = "8.0" # Latest major version 
+  instance_class          = "db.t3.micro"
+  allocated_storage       = "20"
+  username                = "admin"
+  password                = var.password
+  apply_immediately       = true
+  multi_az                = false
+  backup_retention_period = 0
+  storage_encrypted       = false
+  skip_final_snapshot     = true
+  monitoring_interval     = 0
+  publicly_accessible     = true
+
+  tags = merge({
+    Name        = "${local.resource_prefix.value}-rds"
+    Environment = local.resource_prefix.value
+    }, {
+    git_commit           = "e6d83b21346fe85d4fe28b16c0b2f1e0662eb1d7"
+    git_file             = "terraform/aws/db-app.tf"
+    git_last_modified_at = "2023-04-27 12:47:51"
+    git_last_modified_by = "nadler@paloaltonetworks.com"
+    git_modifiers        = "nadler/nimrodkor"
+    git_org              = "bridgecrewio"
+    git_repo             = "terragoat"
+    yor_trace            = "47c13290-c2ce-48a7-b666-1b0085effb92"
+  })
+
+  # Ignore password changes from tf plan diff
+  lifecycle {
+    ignore_changes = ["password"]
+  }
+}
+
+resource "aws_db_option_group" "default" {
+  engine_name              = "mysql"
+  name                     = "og-${local.resource_prefix.value}"
+  major_engine_version     = "8.0"
+  option_group_description = "Terraform OG"
+
+  tags = merge({
+    Name        = "${local.resource_prefix.value}-og"
+    Environment = local.resource_prefix.value
+    }, {
+    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
+    git_file             = "terraform/aws/db-app.tf"
+    git_last_modified_at = "2020-06-16 14:46:24"
+    git_last_modified_by = "nimrodkor@gmail.com"
+    git_modifiers        = "nimrodkor"
+    git_org              = "bridgecrewio"
+    git_repo             = "terragoat"
+    yor_trace            = "c8076043-5de7-4203-9a1c-b4e61900628a"
+  })
+}
+
+resource "aws_db_parameter_group" "default" {
+  name        = "pg-${local.resource_prefix.value}"
+  family      = "mysql8.0"
+  description = "Terraform PG"
+
+  parameter {
+    name         = "character_set_client"
+    value        = "utf8"
+    apply_method = "immediate"
+  }
+
+  parameter {
+    name         = "character_set_server"
+    value        = "utf8"
+    apply_method = "immediate"
+  }
+
+  tags = merge({
+    Name        = "${local.resource_prefix.value}-pg"
+    Environment = local.resource_prefix.value
+    }, {
+    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
+    git_file             = "terraform/aws/db-app.tf"
+    git_last_modified_at = "2020-06-16 14:46:24"
+    git_last_modified_by = "nimrodkor@gmail.com"
+    git_modifiers        = "nimrodkor"
+    git_org              = "bridgecrewio"
+    git_repo             = "terragoat"
+    yor_trace            = "6432b3f9-3f45-4463-befc-2e0f2fbdffc1"
+  })
+}
+
+resource "aws_db_subnet_group" "default" {
+  name        = "sg-${local.resource_prefix.value}"
+  subnet_ids  = ["${aws_subnet.web_subnet.id}", "${aws_subnet.web_subnet2.id}"]
+  description = "Terraform DB Subnet Group"
+
+  tags = merge({
+    Name        = "sg-${local.resource_prefix.value}"
+    Environment = local.resource_prefix.value
+    }, {
+    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
+    git_file             = "terraform/aws/db-app.tf"
+    git_last_modified_at = "2020-06-16 14:46:24"
+    git_last_modified_by = "nimrodkor@gmail.com"
+    git_modifiers        = "nimrodkor"
+    git_org              = "bridgecrewio"
+    git_repo             = "terragoat"
+    yor_trace            = "b8368249-50c5-4a24-bdb0-9f83d197b11c"
+  })
+}
+
+resource "aws_security_group" "default" {
+  name   = "${local.resource_prefix.value}-rds-sg"
+  vpc_id = aws_vpc.web_vpc.id
+
+  tags = merge({
+    Name        = "${local.resource_prefix.value}-rds-sg"
+    Environment = local.resource_prefix.value
+    }, {
+    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
+    git_file             = "terraform/aws/db-app.tf"
+    git_last_modified_at = "2020-06-16 14:46:24"
+    git_last_modified_by = "nimrodkor@gmail.com"
+    git_modifiers        = "nimrodkor"
+    git_org              = "bridgecrewio"
+    git_repo             = "terragoat"
+    yor_trace            = "7b251090-8ac1-4290-bd2e-bf3e16126430"
+  })
+}
+
+resource "aws_security_group_rule" "ingress" {
+  type              = "ingress"
+  from_port         = "3306"
+  to_port           = "3306"
+  protocol          = "tcp"
+  cidr_blocks       = ["${aws_vpc.web_vpc.cidr_block}"]
+  security_group_id = aws_security_group.default.id
+}
+
+resource "aws_security_group_rule" "egress" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = "${aws_security_group.default.id}"
+}
+
+
+### EC2 instance 
+resource "aws_iam_instance_profile" "ec2profile" {
+  name = "${local.resource_prefix.value}-profile"
+  role = "${aws_iam_role.ec2role.name}"
+  tags = {
+    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
+    git_file             = "terraform/aws/db-app.tf"
+    git_last_modified_at = "2020-06-16 14:46:24"
+    git_last_modified_by = "nimrodkor@gmail.com"
+    git_modifiers        = "nimrodkor"
+    git_org              = "bridgecrewio"
+    git_repo             = "terragoat"
+    yor_trace            = "6d33b2b9-2dd3-4915-b5d4-283152c928f1"
+  }
+}
+
+resource "aws_iam_role" "ec2role" {
+  name = "${local.resource_prefix.value}-role"
+  path = "/"
+
+  assume_role_policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": "sts:AssumeRole",
+            "Principal": {
+               "Service": "ec2.amazonaws.com"
+            },
+            "Effect": "Allow",
+            "Sid": ""
+        }
+    ]
+}
+EOF
+
+  tags = merge({
+    Name        = "${local.resource_prefix.value}-role"
+    Environment = local.resource_prefix.value
+    }, {
+    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
+    git_file             = "terraform/aws/db-app.tf"
+    git_last_modified_at = "2020-06-16 14:46:24"
+    git_last_modified_by = "nimrodkor@gmail.com"
+    git_modifiers        = "nimrodkor"
+    git_org              = "bridgecrewio"
+    git_repo             = "terragoat"
+    yor_trace            = "d4b631c1-c1d0-4986-affb-fb8b94a6a7a5"
+  })
+}
+
+resource "aws_iam_role_policy" "ec2policy" {
+  name = "${local.resource_prefix.value}-policy"
+  role = aws_iam_role.ec2role.id
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "s3:*",
+        "ec2:*",
+        "rds:*"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
+
+data "aws_ami" "amazon-linux-2" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "owner-alias"
+    values = ["amazon"]
+  }
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-ebs"]
+  }
+}
+
+resource "aws_instance" "db_app" {
   # ec2 have plain text secrets in user data
-  ami           = "${var.ami}"
-  instance_type = "t2.nano"
+  ami                  = data.aws_ami.amazon-linux-2.id
+  instance_type        = "t2.nano"
+  iam_instance_profile = aws_iam_instance_profile.ec2profile.name
 
   vpc_security_group_ids = [
   "${aws_security_group.web-node.id}"]
   subnet_id = "${aws_subnet.web_subnet.id}"
   user_data = <<EOF
 #! /bin/bash
-sudo apt-get update
-sudo apt-get install -y apache2
-sudo systemctl start apache2
-sudo systemctl enable apache2
-export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMAAA
-export AWS_SECRET_ACCESS_KEY=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
-export AWS_DEFAULT_REGION=us-west-2
-echo "<h1>Deployed via Terraform</h1>" | sudo tee /var/www/html/index.html
+### Config from https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Tutorials.WebServerDB.CreateWebServer.html
+sudo yum -y update
+sudo yum -y install httpd php php-mysqlnd
+sudo systemctl enable httpd 
+sudo systemctl start httpd
+
+sudo mkdir /var/www/inc
+cat << EnD > /tmp/dbinfo.inc
+<?php
+define('DB_SERVER', '${aws_db_instance.default.endpoint}');
+define('DB_USERNAME', '${aws_db_instance.default.username}');
+define('DB_PASSWORD', '${var.password}');
+define('DB_DATABASE', '${aws_db_instance.default.name}');
+?>
+EnD
+sudo mv /tmp/dbinfo.inc /var/www/inc 
+sudo chown root:root /var/www/inc/dbinfo.inc
+
+cat << EnD > /tmp/index.php
+<?php include "../inc/dbinfo.inc"; ?>
+<html>
+<body>
+<h1>Sample page</h1>
+<?php
+
+  /* Connect to MySQL and select the database. */
+  \$connection = mysqli_connect(DB_SERVER, DB_USERNAME, DB_PASSWORD);
+
+  if (mysqli_connect_errno()) echo "Failed to connect to MySQL: " . mysqli_connect_error();
+
+  \$database = mysqli_select_db(\$connection, DB_DATABASE);
+
+  /* Ensure that the EMPLOYEES table exists. */
+  VerifyEmployeesTable(\$connection, DB_DATABASE);
+
+  /* If input fields are populated, add a row to the EMPLOYEES table. */
+  \$employee_name = htmlentities(\$_POST['NAME']);
+  \$employee_address = htmlentities(\$_POST['ADDRESS']);
+
+  if (strlen(\$employee_name) || strlen(\$employee_address)) {
+    AddEmployee(\$connection, \$employee_name, \$employee_address);
+  }
+?>
+
+<!-- Input form -->
+<form action="<?PHP echo \$_SERVER['SCRIPT_NAME'] ?>" method="POST">
+  <table border="0">
+    <tr>
+      <td>NAME</td>
+      <td>ADDRESS</td>
+    </tr>
+    <tr>
+      <td>
+        <input type="text" name="NAME" maxlength="45" size="30" />
+      </td>
+      <td>
+        <input type="text" name="ADDRESS" maxlength="90" size="60" />
+      </td>
+      <td>
+        <input type="submit" value="Add Data" />
+      </td>
+    </tr>
+  </table>
+</form>
+
+<!-- Display table data. -->
+<table border="1" cellpadding="2" cellspacing="2">
+  <tr>
+    <td>ID</td>
+    <td>NAME</td>
+    <td>ADDRESS</td>
+  </tr>
+
+<?php
+
+\$result = mysqli_query(\$connection, "SELECT * FROM EMPLOYEES");
+
+while(\$query_data = mysqli_fetch_row(\$result)) {
+  echo "<tr>";
+  echo "<td>",\$query_data[0], "</td>",
+       "<td>",\$query_data[1], "</td>",
+       "<td>",\$query_data[2], "</td>";
+  echo "</tr>";
+}
+?>
+
+</table>
+
+<!-- Clean up. -->
+<?php
+
+  mysqli_free_result(\$result);
+  mysqli_close(\$connection);
+
+?>
+
+</body>
+</html>
+
+
+<?php
+
+/* Add an employee to the table. */
+function AddEmployee(\$connection, \$name, \$address) {
+   \$n = mysqli_real_escape_string(\$connection, \$name);
+   \$a = mysqli_real_escape_string(\$connection, \$address);
+
+   \$query = "INSERT INTO EMPLOYEES (NAME, ADDRESS) VALUES ('\$n', '\$a');";
+
+   if(!mysqli_query(\$connection, \$query)) echo("<p>Error adding employee data.</p>");
+}
+
+/* Check whether the table exists and, if not, create it. */
+function VerifyEmployeesTable(\$connection, \$dbName) {
+  if(!TableExists("EMPLOYEES", \$connection, \$dbName))
+  {
+     \$query = "CREATE TABLE EMPLOYEES (
+         ID int(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+         NAME VARCHAR(45),
+         ADDRESS VARCHAR(90)
+       )";
+
+     if(!mysqli_query(\$connection, \$query)) echo("<p>Error creating table.</p>");
+  }
+}
+
+/* Check for the existence of a table. */
+function TableExists(\$tableName, \$connection, \$dbName) {
+  \$t = mysqli_real_escape_string(\$connection, \$tableName);
+  \$d = mysqli_real_escape_string(\$connection, \$dbName);
+
+  \$checktable = mysqli_query(\$connection,
+      "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_NAME = '\$t' AND TABLE_SCHEMA = '\$d'");
+
+  if(mysqli_num_rows(\$checktable) > 0) return true;
+
+  return false;
+}
+?>               
+EnD
+
+sudo mv /tmp/index.php /var/www/html
+sudo chown root:root /var/www/html/index.php
+
+
+
 EOF
   tags = merge({
-    Name = "${local.resource_prefix.value}-ec2"
+    Name = "${local.resource_prefix.value}-dbapp"
     }, {
     git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
+    git_file             = "terraform/aws/db-app.tf"
     git_last_modified_at = "2020-06-16 14:46:24"
     git_last_modified_by = "nimrodkor@gmail.com"
     git_modifiers        = "nimrodkor"
     git_org              = "bridgecrewio"
     git_repo             = "terragoat"
-    yor_trace            = "347af3cd-4f70-4632-aca3-4d5e30ffc0b6"
+    yor_trace            = "f7999d4e-c983-43ee-bd88-7903a6f8483e"
   })
 }
 
-resource "aws_ebs_volume" "web_host_storage" {
-  # unencrypted volume
-  availability_zone = "${var.region}a"
-  #encrypted         = false  # Setting this causes the volume to be recreated on apply 
-  size = 1
-  tags = merge({
-    Name = "${local.resource_prefix.value}-ebs"
-    }, {
-    git_commit           = "d3439f0f2af62f6fa3521e14d6c27819ef8f12e1"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2021-05-02 11:17:26"
-    git_last_modified_by = "nimrodkor@users.noreply.github.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "c5509daf-10f0-46af-9e03-41989212521d"
-  })
+output "db_app_public_dns" {
+  description = "DB Public DNS name"
+  value       = aws_instance.db_app.public_dns
 }
 
-resource "aws_ebs_snapshot" "example_snapshot" {
-  # ebs snapshot without encryption
-  volume_id   = "${aws_ebs_volume.web_host_storage.id}"
-  description = "${local.resource_prefix.value}-ebs-snapshot"
-  tags = merge({
-    Name = "${local.resource_prefix.value}-ebs-snapshot"
-    }, {
-    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2020-06-16 14:46:24"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "c1008080-ec2f-4512-a0d0-2e9330aa58f0"
-  })
+output "db_endpoint" {
+  description = "DB Endpoint"
+  value       = aws_db_instance.default.endpoint
 }
 
-resource "aws_volume_attachment" "ebs_att" {
-  device_name = "/dev/sdh"
-  volume_id   = "${aws_ebs_volume.web_host_storage.id}"
-  instance_id = "${aws_instance.web_host.id}"
-}
-
-resource "aws_security_group" "web-node" {
-  # security group is open to the world in SSH port
-  name        = "${local.resource_prefix.value}-sg"
-  description = "${local.resource_prefix.value} Security Group"
-  vpc_id      = aws_vpc.web_vpc.id
-
-  ingress {
-    from_port = 80
-    to_port   = 80
-    protocol  = "tcp"
-    cidr_blocks = [
-    "0.0.0.0/0"]
-  }
-  ingress {
-    from_port = 22
-    to_port   = 22
-    protocol  = "tcp"
-    cidr_blocks = [
-    "0.0.0.0/0"]
-  }
-  egress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    cidr_blocks = [
-    "0.0.0.0/0"]
-  }
-  depends_on = [aws_vpc.web_vpc]
-  tags = {
-    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2020-06-16 14:46:24"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "b7af1b40-64eb-4519-a1a0-ab198db4b193"
-  }
-}
-
-resource "aws_vpc" "web_vpc" {
-  cidr_block           = "172.16.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-  tags = merge({
-    Name = "${local.resource_prefix.value}-vpc"
-    }, {
-    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2020-06-16 14:46:24"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "9bf2359b-952e-4570-9595-52eba4c20473"
-  })
-}
-
-resource "aws_subnet" "web_subnet" {
-  vpc_id                  = aws_vpc.web_vpc.id
-  cidr_block              = "172.16.10.0/24"
-  availability_zone       = "${var.region}a"
-  map_public_ip_on_launch = true
-
-  tags = merge({
-    Name = "${local.resource_prefix.value}-subnet"
-    }, {
-    git_commit           = "6e62522d2ab8f63740e53752b84a6e99cd65696a"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2021-05-02 11:16:31"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "0345f650-d280-4ca8-86c9-c71c38c0eda8"
-  })
-}
-
-resource "aws_subnet" "web_subnet2" {
-  vpc_id                  = aws_vpc.web_vpc.id
-  cidr_block              = "172.16.11.0/24"
-  availability_zone       = "${var.region}b"
-  map_public_ip_on_launch = true
-
-  tags = merge({
-    Name = "${local.resource_prefix.value}-subnet2"
-    }, {
-    git_commit           = "6e62522d2ab8f63740e53752b84a6e99cd65696a"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2021-05-02 11:16:31"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "224af03a-00e0-4981-be30-14965833c2db"
-  })
-}
-
-
-resource "aws_internet_gateway" "web_igw" {
-  vpc_id = aws_vpc.web_vpc.id
-
-  tags = merge({
-    Name = "${local.resource_prefix.value}-igw"
-    }, {
-    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2020-06-16 14:46:24"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "d8e63cb4-2fb5-4726-9c86-5fd05ef03674"
-  })
-}
-
-resource "aws_route_table" "web_rtb" {
-  vpc_id = aws_vpc.web_vpc.id
-
-  tags = merge({
-    Name = "${local.resource_prefix.value}-rtb"
-    }, {
-    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2020-06-16 14:46:24"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "5e4fee6e-a6aa-4b61-a741-47c5efb463e1"
-  })
-}
-
-resource "aws_route_table_association" "rtbassoc" {
-  subnet_id      = aws_subnet.web_subnet.id
-  route_table_id = aws_route_table.web_rtb.id
-}
-
-resource "aws_route_table_association" "rtbassoc2" {
-  subnet_id      = aws_subnet.web_subnet2.id
-  route_table_id = aws_route_table.web_rtb.id
-}
-
-resource "aws_route" "public_internet_gateway" {
-  route_table_id         = aws_route_table.web_rtb.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.web_igw.id
-
-  timeouts {
-    create = "5m"
-  }
-}
-
-
-resource "aws_network_interface" "web-eni" {
-  subnet_id   = aws_subnet.web_subnet.id
-  private_ips = ["172.16.10.100"]
-
-  tags = merge({
-    Name = "${local.resource_prefix.value}-primary_network_interface"
-    }, {
-    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2020-06-16 14:46:24"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "7e2ffea8-739f-467d-b57b-53cbc0d7ccbe"
-  })
-}
-
-# VPC Flow Logs to S3
-resource "aws_flow_log" "vpcflowlogs" {
-  log_destination      = aws_s3_bucket.flowbucket.arn
-  log_destination_type = "s3"
-  traffic_type         = "ALL"
-  vpc_id               = aws_vpc.web_vpc.id
-
-  tags = merge({
-    Name        = "${local.resource_prefix.value}-flowlogs"
-    Environment = local.resource_prefix.value
-    }, {
-    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2020-06-16 14:46:24"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "6808d4b7-45bc-4d1d-9523-96757a3add3a"
-  })
-}
-
-resource "aws_s3_bucket" "flowbucket" {
-  bucket        = "${local.resource_prefix.value}-flowlogs"
-  force_destroy = true
-
-  tags = merge({
-    Name        = "${local.resource_prefix.value}-flowlogs"
-    Environment = local.resource_prefix.value
-    }, {
-    git_commit           = "d68d2897add9bc2203a5ed0632a5cdd8ff8cefb0"
-    git_file             = "terraform/aws/ec2.tf"
-    git_last_modified_at = "2020-06-16 14:46:24"
-    git_last_modified_by = "nimrodkor@gmail.com"
-    git_modifiers        = "nimrodkor"
-    git_org              = "bridgecrewio"
-    git_repo             = "terragoat"
-    yor_trace            = "f058838a-b1e0-4383-b965-7e06e987ffb1"
-  })
-}
-
-output "ec2_public_dns" {
-  description = "Web Host Public DNS name"
-  value       = aws_instance.web_host.public_dns
-}
-
-output "vpc_id" {
-  description = "The ID of the VPC"
-  value       = aws_vpc.web_vpc.id
-}
-
-output "public_subnet" {
-  description = "The ID of the Public subnet"
-  value       = aws_subnet.web_subnet.id
-}
-
-output "public_subnet2" {
-  description = "The ID of the Public subnet"
-  value       = aws_subnet.web_subnet2.id
-}
