@@ -12,8 +12,6 @@ ec2_client = boto3.client('ec2')
 # Get all AWS regions
 regions = [region['RegionName'] for region in ec2_client.describe_regions()['Regions']]
 
-# Create a list to store the EC2 instances information
-ec2_instances = []
 
 # Loop through each region and get all running EC2 instances
 for region in regions:
